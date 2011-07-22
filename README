@@ -1,0 +1,6 @@
+After cloning the repo,
+
+- Change app name in app.yaml
+- Remove git remote
+- pip install requirements.txt
+- python link_libraries.py
