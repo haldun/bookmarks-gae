@@ -263,25 +263,24 @@ class ImportBookmarksHandler(BaseTaskHandler):
     # Remove blob
     # TODO The following line does not seem to be working!?
     # blobstore.delete(bookmark_import.blob)
+    taskqueue.add(url='/tasks/process_tags', params={'key': account.key()})
 
 
 class ProcessTagsHandler(BaseTaskHandler):
-  def get(self):
-    # TODO What about deleted bookmarks' tags?
-    # TODO Process all accounts at once!?
-    for account in models.Account.all():
-      tags = collections.defaultdict(int)
-      account_key_name = account.key().name()
-      # TODO Process all bookmarks at once!?
-      for bookmark in account.bookmarks:
-        for tag_name in bookmark.tags:
-          tag_key_name = '%s:%s' % (account_key_name, tag_name)
-          tags[(tag_name, tag_key_name)] += 1
-      db.put(models.Tag(key_name=key_name,
-                        name=name,
-                        count=count,
-                        account=account)
-                        for (name, key_name), count in tags.items())
+  def post(self):
+    account = models.Account.get(self.get_argument('key'))
+    tags = collections.defaultdict(int)
+    account_key_name = account.key().name()
+    # TODO Process all bookmarks at once!?
+    for bookmark in account.bookmarks:
+      for tag_name in bookmark.tags:
+        tag_key_name = '%s:%s' % (account_key_name, tag_name)
+        tags[(tag_name, tag_key_name)] += 1
+    db.put(models.Tag(key_name=key_name,
+                      name=name,
+                      count=count,
+                      account=account)
+                      for (name, key_name), count in tags.items())
 
 
 def main():
