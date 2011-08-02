@@ -7,6 +7,10 @@ handlers:
 - url: /static
   static_dir: static
 
+- url: /tasks/.*
+  script: app.py
+  login: admin
+
 - url: /.*
   script: app.py
 

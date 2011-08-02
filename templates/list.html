@@ -7,3 +7,17 @@
   {% end %}
   </ul>
 {% end %}
+
+{% block sidebar %}
+<h2>Bookmarklets</h2>
+
+<p>Drag the following buttons to your bookmarks bar.</p>
+
+<p>
+  {% module AddBookmarkBookmarklet() %}
+  {% module ReadLaterBookmarklet() %}
+</p>
+
+<h2>Tags</h2>
+<p>Not implemented yet</p>
+{% end %}

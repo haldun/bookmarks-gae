@@ -1,13 +1,16 @@
 import datetime
 import logging
 import os
+import re
 import html5lib
 
 import tornado.web
 import tornado.wsgi
 from tornado.web import url
 
+from google.appengine.api import taskqueue
 from google.appengine.api import users
+from google.appengine.ext import blobstore
 from google.appengine.ext import db
 from google.appengine.ext.webapp.util import run_wsgi_app
 
@@ -24,9 +27,12 @@ class Application(tornado.wsgi.WSGIApplication):
       url(r'/', IndexHandler, name='index'),
       url(r'/new', NewBookmarkHandler, name='new_bookmark'),
       url(r'/bookmarks/([^/]+)', ListBookmarksHandler, name='list'),
-      url(r'/import', ImportBookmarksHandler, name='import'),
       url(r'/edit', EditBookmarkHandler, name='edit'),
       url(r'/update', UpdateBookmarkHandler, name='update'),
+      (r'/upload', UploadHandler),
+
+      # Task handlers
+      (r'/import', ImportBookmarksHandler),
     ]
     settings = dict(
       debug=IS_DEV,
@@ -80,7 +86,7 @@ class ListBookmarksHandler(BaseHandler):
       query = models.Bookmark.all().filter('account =', self.current_account)
     else:
       query = models.Bookmark.all() \
-                    .filter('account =', self.current_account) \
+                    .filter('account =', account) \
                     .filter('is_private =', False)
     query = query.order('-created')
     # Pagination
@@ -97,10 +103,22 @@ class ListBookmarksHandler(BaseHandler):
 class NewBookmarkHandler(BaseHandler):
   @tornado.web.authenticated
   def get(self):
-    self.render('new.html', form=forms.BookmarkForm())
+    # Check if popup
+    is_popup = self.get_argument('p', None) == '1'
+    if is_popup:
+      bookmark = models.Bookmark.get_bookmark_for_uri(self.get_argument('uri'))
+      if bookmark is None:
+        form = forms.BookmarkForm(self)
+      else:
+        self.redirect(self.reverse_url('edit') + '?&p=1&id=' + bookmark.uri_digest)
+        return
+    else:
+      form = forms.BookmarkForm()
+    self.render('bookmark-form.html', form=form, is_popup=is_popup)
 
   @tornado.web.authenticated
   def post(self):
+    is_popup = self.get_argument('p', None) == '1'
     form = forms.BookmarkForm(self)
     if form.validate():
       uri_digest = models.Bookmark.get_digest_for_uri(form.uri.data)
@@ -111,25 +129,30 @@ class NewBookmarkHandler(BaseHandler):
           uri_digest=uri_digest,
           **form.data)
       bookmark.put()
-      self.redirect(self.reverse_url('index'))
+      if is_popup:
+        self.write('<script>window.close()</script>')
+      else:
+        self.redirect(self.reverse_url('index'))
     else:
-      self.render('new.html', form=form)
+      self.render('bookmark-form.html', form=form)
 
 
 class EditBookmarkHandler(BaseHandler):
   def get(self):
     form = forms.BookmarkForm(obj=self.bookmark)
-    self.render('new.html', form=form)
+    self.render('bookmark-form.html', form=form)
 
   def post(self):
     form = forms.BookmarkForm(self, obj=self.bookmark)
     if form.validate():
-      self.write('%s' % self.bookmark.title)
       form.populate_obj(self.bookmark)
       self.bookmark.put()
-      self.redirect(self.reverse_url('index'))
+      if self.get_argument('p', None):
+        self.write('<script>window.close()</script>')
+      else:
+        self.redirect(self.reverse_url('index'))
     else:
-      self.render('new.html', form=form)
+      self.render('bookmark-form.html', form=form)
 
   @tornado.web.authenticated
   def prepare(self):
@@ -142,43 +165,22 @@ class EditBookmarkHandler(BaseHandler):
     self.bookmark = bookmark
 
 
-class ImportBookmarksHandler(BaseHandler):
+class UploadHandler(BaseHandler):
   @tornado.web.authenticated
   def get(self):
-    self.render('import.html')
+    self.render('upload.html', upload_url=blobstore.create_upload_url('/upload'))
 
   @tornado.web.authenticated
   def post(self):
-    body = self.request.files['file'][0]['body']
-    parser = html5lib.HTMLParser(
-        tree=html5lib.treebuilders.getTreeBuilder('dom'))
-    dom_tree = parser.parse(body)
-    bookmarks = []
-    for link in dom_tree.getElementsByTagName('a'):
-      uri = link.getAttribute('href')
-      if not uri.startswith('http://'):
-        continue
-      title = ''.join(node.data
-                      for node in link.childNodes
-                      if node.nodeType == node.TEXT_NODE)
-      uri_digest = models.Bookmark.get_digest_for_uri(uri)
-      key = '%s:%s' % (self.current_account.key().name(), uri_digest)
-      is_private = link.getAttribute('private') == '1'
-      created = link.getAttribute('add_date')
-      try:
-        created = datetime.datetime.utcfromtimestamp(float(created))
-      except:
-        pass
-      tags = [tag.strip()
-              for tag in link.getAttribute('tags').strip().split(',')
-              if link.getAttribute('tags')]
-      bookmark = models.Bookmark(
-          key_name=key, account=self.current_account, uri_digest=uri_digest,
-          title=title, uri=uri, private=is_private, created=created,
-          tags=tags)
-      bookmarks.append(bookmark)
-    db.put(bookmarks)
-    self.redirect(self.reverse_url('index'))
+    if IS_DEV:
+      blob_key = re.findall(r'blob-key="*(\S+)"', self.request.body)[0]
+    else:
+      blob_key = re.findall(r'blob-key=(.+)', self.request.body)[0]
+    new_import = models.Import(account=self.current_account,
+                               blob=blob_key)
+    new_import.put()
+    taskqueue.add(url='/import', params={'key': new_import.key()})
+    self.redirect('/')
 
 
 class UpdateBookmarkHandler(BaseHandler):
@@ -201,6 +203,52 @@ class UpdateBookmarkHandler(BaseHandler):
       bookmark.is_unread = True
     bookmark.put()
     self.render('module-bookmark.html', bookmark=bookmark)
+
+
+# Task handlers
+
+class ImportBookmarksHandler(BaseHandler):
+  def initialize(self):
+    self.application.settings['xsrf_cookies'] = False
+
+  # TODO Catch exceptions
+  def post(self):
+    bookmark_import = models.Import.get(self.get_argument('key'))
+    parser = html5lib.HTMLParser(
+        tree=html5lib.treebuilders.getTreeBuilder('dom'))
+    dom_tree = parser.parse(bookmark_import.blob.open())
+    bookmarks = []
+    account = bookmark_import.account
+    for link in dom_tree.getElementsByTagName('a'):
+      uri = link.getAttribute('href')
+      if not uri.startswith('http://'):
+        continue
+      title = ''.join(node.data
+                      for node in link.childNodes
+                      if node.nodeType == node.TEXT_NODE)
+      uri_digest = models.Bookmark.get_digest_for_uri(uri)
+      key = '%s:%s' % (account.key().name(), uri_digest)
+      is_private = link.getAttribute('private') == '1'
+      created = link.getAttribute('add_date')
+      try:
+        created = datetime.datetime.utcfromtimestamp(float(created))
+      except:
+        pass
+      tags = [tag.strip()
+              for tag in link.getAttribute('tags').strip().split(',')
+              if link.getAttribute('tags')]
+      bookmark = models.Bookmark(
+          key_name=key, account=account, uri_digest=uri_digest,
+          title=title, uri=uri, private=is_private, created=created,
+          tags=tags)
+      bookmarks.append(bookmark)
+    db.put(bookmarks)
+    # Mark this task as completed
+    bookmark_import.status = bookmark_import.DONE
+    bookmark_import.processed = datetime.datetime.utcnow()
+    bookmark_import.put()
+    # Remove blob
+    blobstore.delete(bookmark_import.blob)
 
 def main():
   run_wsgi_app(Application())

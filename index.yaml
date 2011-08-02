@@ -19,5 +19,12 @@ indexes:
 - kind: Bookmark
   properties:
   - name: account
+  - name: is_private
+  - name: created
+    direction: desc
+
+- kind: Bookmark
+  properties:
+  - name: account
   - name: uri_digest
     direction: desc

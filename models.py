@@ -1,6 +1,7 @@
 import hashlib
 
 from google.appengine.ext import db
+from google.appengine.ext import blobstore
 
 class Account(db.Model):
   user = db.UserProperty(auto_current_user_add=True, required=True)
@@ -76,3 +77,18 @@ class Bookmark(db.Model):
   @classmethod
   def get_bookmark_for_digest(cls, digest):
     return cls.all().filter('uri_digest =', digest).get()
+
+  @classmethod
+  def get_bookmark_for_uri(cls, uri):
+    return cls.get_bookmark_for_digest(cls.get_digest_for_uri(uri))
+
+
+class Import(db.Model):
+  PENDING = 1
+  DONE = 2
+
+  account = db.ReferenceProperty(Account, collection_name='imports')
+  blob = blobstore.BlobReferenceProperty()
+  created = db.DateTimeProperty(auto_now_add=True)
+  processed = db.DateTimeProperty()
+  status = db.IntegerProperty(default=PENDING)
