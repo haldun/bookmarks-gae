@@ -11,3 +11,4 @@
 # Linked libraries
 tornado
 wtforms
+html5lib
