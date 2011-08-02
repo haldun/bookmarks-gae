@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>bookmarklove</title>
+  <link href="http://fonts.googleapis.com/css?family=Cabin+Sketch:700&v2" rel="stylesheet">
+  <link rel="stylesheet" href="{{ static_url('stylesheets/style.css') }}">
+</head>
+<body>
+  <div id="container" class="container_12">
+    <div id="header">
+      <h1 class="logo">bookmarklove</h1>
+    </div>
+
+    <div id="main" class="grid_8">
+      {% block content %}{% end %}
+    </div>
+
+    <div id="sidebar" class="grid_4">
+      {% block sidebar %}{% end %}
+    </div>
+
+    <br class="clear">
+
+    <div id="footer">
+      bookmarklove.me
+    </div>
+  </div>
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js"></script>
+  <script src="/static/javascripts/site.js"></script>
+  {% block scripts %}{% end %}
+</body>
+</html>

@@ -1,6 +1,9 @@
 from wtforms import *
 from wtforms.validators import *
 
+import wtforms.fields
+import wtforms.widgets
+
 from django.utils.datastructures import MultiValueDict
 
 class BaseForm(Form):
@@ -12,4 +15,25 @@ class BaseForm(Form):
     Form.__init__(self, formdata, obj=obj, prefix=prefix, **kwargs)
 
 
-# TODO Put your form classes here
+class TagListField(wtforms.fields.Field):
+  widget = wtforms.widgets.TextInput()
+
+  def _value(self):
+    if self.data:
+      return u', '.join(self.data)
+    return u''
+
+  def process_formdata(self, valuelist):
+    if valuelist:
+      self.data = list(set(x.strip().lower() for x in valuelist[0].strip().split(',')))
+    else:
+      self.data = []
+
+
+class BookmarkForm(BaseForm):
+  title = TextField('title')
+  uri = TextField('url', [Required()])
+  description = TextAreaField('description')
+  tags = TagListField('tags')
+  is_unread = BooleanField('is unread?', default=False)
+  is_private = BooleanField('is private?', default=False)

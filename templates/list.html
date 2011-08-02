@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <ul id="bookmarks">
+  {% for bookmark in bookmarks %}
+    {% module Bookmark(bookmark) %}
+  {% end %}
+  </ul>
+{% end %}

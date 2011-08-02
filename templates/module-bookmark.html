@@ -1,0 +1,15 @@
+<li class="bookmark" id="bookmark_{{ bookmark.uri_digest }}">
+  {% if bookmark.is_starred %}
+    <a href="#" class="unstar" data-action="unstar">★</a>
+  {% else %}
+    <a href="#" class="star" data-action="star">☆</a>
+  {% end %}
+
+  <a href="{{ bookmark.uri }}">{{ bookmark.title }}</a>
+
+  <div class="tags">
+    {% for tag in bookmark.tags %}
+      <a href="#" class="tag">{{ tag }}</a>
+    {% end %}
+  </div>
+</li>
