@@ -1,5 +1,7 @@
 import hashlib
+import logging
 
+from google.appengine.api import memcache
 from google.appengine.ext import db
 from google.appengine.ext import blobstore
 
@@ -53,6 +55,24 @@ class Account(db.Model):
     assert nickname
     assert '@' not in nickname
     return cls.all().filter('lower_nickname =', nickname.lower()).get()
+
+  def get_tags(self):
+    tags = memcache.get('%s:tags' % self.key())
+    if tags is not None:
+      return tags
+    tags = list(Tag.all().filter('account =', self))
+    if not memcache.add('%s:tags' % self.key(), tags, 3600):
+      logging.error('Memcache set failed')
+    return tags
+
+  def get_popular_tags(self, limit=20):
+    tags = memcache.get('%s:popular_tags' % self.nickname)
+    if tags is not None:
+      return tags
+    tags = Tag.all().filter('account =', self).order('-count').fetch(limit)
+    if not memcache.add('%s:popular_tags' % self.nickname, tags, 3600):
+      logging.error('Memcache set failed')
+    return tags
 
 
 class Bookmark(db.Model):

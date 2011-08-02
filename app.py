@@ -10,6 +10,7 @@ import tornado.web
 import tornado.wsgi
 from tornado.web import url
 
+from google.appengine.api import memcache
 from google.appengine.api import taskqueue
 from google.appengine.api import users
 from google.appengine.ext import blobstore
@@ -104,9 +105,7 @@ class ListBookmarksHandler(BaseHandler):
       'first': offset + 1,
     }
     bookmarks = query.fetch(limit + 1, offset)
-    tags = models.Tag.all().filter('account =', self.current_account) \
-                           .order('-count') \
-                           .fetch(20)
+    tags = account.get_popular_tags(20)
     self.render('list.html', bookmarks=bookmarks, tags=tags)
 
 
