@@ -83,6 +83,12 @@ class Bookmark(db.Model):
     return cls.get_bookmark_for_digest(cls.get_digest_for_uri(uri))
 
 
+class Tag(db.Model):
+  account = db.ReferenceProperty(Account, collection_name='tags')
+  name = db.StringProperty(required=True)
+  count = db.IntegerProperty(default=0)
+
+
 class Import(db.Model):
   PENDING = 1
   DONE = 2

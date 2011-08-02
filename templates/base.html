@@ -10,6 +10,7 @@
   <div id="container" class="container_12">
     <div id="header">
       <h1 class="logo">bookmarklove</h1>
+      <a href="{{ escape(users.create_logout_url(request.uri)) }}">{{ _("Sign out") }}</a>
     </div>
 
     <div id="main" class="grid_8">

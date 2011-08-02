@@ -1,4 +1,6 @@
+import collections
 import datetime
+import itertools
 import logging
 import os
 import re
@@ -32,7 +34,8 @@ class Application(tornado.wsgi.WSGIApplication):
       (r'/upload', UploadHandler),
 
       # Task handlers
-      (r'/import', ImportBookmarksHandler),
+      (r'/tasks/import', ImportBookmarksHandler),
+      (r'/tasks/process_tags', ProcessTagsHandler),
     ]
     settings = dict(
       debug=IS_DEV,
@@ -56,6 +59,10 @@ class BaseHandler(tornado.web.RequestHandler):
 
   def get_login_url(self):
     return users.create_login_url(self.request.uri)
+
+  def render_string(self, template, **kwds):
+    return tornado.web.RequestHandler.render_string(
+        self, template, users=users, **kwds)
 
   def get_integer(self, name, default, min_value=None, max_value=None):
     value = self.get_argument(name, '')
@@ -97,7 +104,10 @@ class ListBookmarksHandler(BaseHandler):
       'first': offset + 1,
     }
     bookmarks = query.fetch(limit + 1, offset)
-    self.render('list.html', bookmarks=bookmarks)
+    tags = models.Tag.all().filter('account =', self.current_account) \
+                           .order('-count') \
+                           .fetch(20)
+    self.render('list.html', bookmarks=bookmarks, tags=tags)
 
 
 class NewBookmarkHandler(BaseHandler):
@@ -121,8 +131,9 @@ class NewBookmarkHandler(BaseHandler):
     is_popup = self.get_argument('p', None) == '1'
     form = forms.BookmarkForm(self)
     if form.validate():
+      account_key_name = self.current_account.key().name()
       uri_digest = models.Bookmark.get_digest_for_uri(form.uri.data)
-      key = '%s:%s' % (self.current_account.key().name(), uri_digest)
+      key = '%s:%s' % (account_key_name, uri_digest)
       bookmark = models.Bookmark(
           key_name=key,
           account=self.current_account,
@@ -179,7 +190,7 @@ class UploadHandler(BaseHandler):
     new_import = models.Import(account=self.current_account,
                                blob=blob_key)
     new_import.put()
-    taskqueue.add(url='/import', params={'key': new_import.key()})
+    taskqueue.add(url='/tasks/import', params={'key': new_import.key()})
     self.redirect('/')
 
 
@@ -207,10 +218,12 @@ class UpdateBookmarkHandler(BaseHandler):
 
 # Task handlers
 
-class ImportBookmarksHandler(BaseHandler):
+class BaseTaskHandler(BaseHandler):
   def initialize(self):
     self.application.settings['xsrf_cookies'] = False
 
+
+class ImportBookmarksHandler(BaseTaskHandler):
   # TODO Catch exceptions
   def post(self):
     bookmark_import = models.Import.get(self.get_argument('key'))
@@ -234,7 +247,7 @@ class ImportBookmarksHandler(BaseHandler):
         created = datetime.datetime.utcfromtimestamp(float(created))
       except:
         pass
-      tags = [tag.strip()
+      tags = [tag.strip().lower()
               for tag in link.getAttribute('tags').strip().split(',')
               if link.getAttribute('tags')]
       bookmark = models.Bookmark(
@@ -248,7 +261,28 @@ class ImportBookmarksHandler(BaseHandler):
     bookmark_import.processed = datetime.datetime.utcnow()
     bookmark_import.put()
     # Remove blob
-    blobstore.delete(bookmark_import.blob)
+    # TODO The following line does not seem to be working!?
+    # blobstore.delete(bookmark_import.blob)
+
+
+class ProcessTagsHandler(BaseTaskHandler):
+  def get(self):
+    # TODO What about deleted bookmarks' tags?
+    # TODO Process all accounts at once!?
+    for account in models.Account.all():
+      tags = collections.defaultdict(int)
+      account_key_name = account.key().name()
+      # TODO Process all bookmarks at once!?
+      for bookmark in account.bookmarks:
+        for tag_name in bookmark.tags:
+          tag_key_name = '%s:%s' % (account_key_name, tag_name)
+          tags[(tag_name, tag_key_name)] += 1
+      db.put(models.Tag(key_name=key_name,
+                        name=name,
+                        count=count,
+                        account=account)
+                        for (name, key_name), count in tags.items())
+
 
 def main():
   run_wsgi_app(Application())

@@ -1,0 +1,4 @@
+cron:
+- description: process tags
+  url: /tasks/process_tags
+  schedule: every 60 minutes

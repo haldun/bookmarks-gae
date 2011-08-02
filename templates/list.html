@@ -19,5 +19,9 @@
 </p>
 
 <h2>Tags</h2>
-<p>Not implemented yet</p>
+<p>
+  {% for tag in tags %}
+    <a href="">{{ tag.name }} ({{ tag.count }})</a>
+  {% end %}
+</p>
 {% end %}

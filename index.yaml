@@ -28,3 +28,9 @@ indexes:
   - name: account
   - name: uri_digest
     direction: desc
+
+- kind: Tag
+  properties:
+  - name: account
+  - name: count
+    direction: desc
