@@ -9,6 +9,12 @@
   <a href="{{ bookmark.uri }}" class="title">{{ bookmark.title }}</a>
   </div>
 
+  {% if bookmark.description %}
+    <div class="description">
+      {{ bookmark.description }}
+    </div>
+  {% end %}
+
   <div class="tags">
     {% for tag in bookmark.tags %}
       <a href="#" class="tag">{{ tag }}</a>
