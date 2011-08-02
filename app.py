@@ -195,6 +195,10 @@ class UpdateBookmarkHandler(BaseHandler):
       bookmark.is_starred = True
     elif action == 'unstar':
       bookmark.is_starred = False
+    elif action == 'read':
+      bookmark.is_unread = False
+    elif action == 'unread':
+      bookmark.is_unread = True
     bookmark.put()
     self.render('module-bookmark.html', bookmark=bookmark)
 

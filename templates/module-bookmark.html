@@ -1,15 +1,31 @@
 <li class="bookmark" id="bookmark_{{ bookmark.uri_digest }}">
+  <div class="header">
   {% if bookmark.is_starred %}
     <a href="#" class="unstar" data-action="unstar">★</a>
   {% else %}
     <a href="#" class="star" data-action="star">☆</a>
   {% end %}
 
-  <a href="{{ bookmark.uri }}">{{ bookmark.title }}</a>
+  <a href="{{ bookmark.uri }}" class="title">{{ bookmark.title }}</a>
+  </div>
 
   <div class="tags">
     {% for tag in bookmark.tags %}
       <a href="#" class="tag">{{ tag }}</a>
     {% end %}
   </div>
+
+  <ul class="button-group">
+    {% if not bookmark.is_unread %}
+      <li><a href="#" data-action="unread"
+             class="button unread pill">Mark Unread</a></li>
+    {% else %}
+      <li><a href="#" data-action="read"
+             class="button icon pill approve read">Mark Read</a></li>
+    {% end %}
+
+    <li><a href="{{ reverse_url('edit') }}?id={{ bookmark.uri_digest }}"
+           class="button pill icon edit">Edit</a></li>
+    <li><a href="#" class="button pill danger trash icon">Delete</a></li>
+  </ul>
 </li>
