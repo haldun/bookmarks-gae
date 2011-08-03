@@ -30,12 +30,13 @@ class Application(tornado.wsgi.WSGIApplication):
   def __init__(self):
     handlers = [
       url(r'/', IndexHandler, name='index'),
-      url(r'/mine', HomeHandler, name='mine'),
+      url(r'/mine', HomeHandler, name='home'),
       url(r'/new', NewBookmarkHandler, name='new_bookmark'),
       url(r'/bookmarks/([^/]+)', ListBookmarksHandler, name='list'),
       url(r'/edit', EditBookmarkHandler, name='edit'),
       url(r'/update', UpdateBookmarkHandler, name='update'),
       (r'/upload', UploadHandler),
+      (r'/later', ReadLaterHandler),
 
       # Task handlers
       (r'/tasks/import', ImportBookmarksHandler),
@@ -88,8 +89,7 @@ class BaseHandler(tornado.web.RequestHandler):
 
 class IndexHandler(BaseHandler):
   def get(self):
-    self.redirect('/home')
-    # self.render('index.html')
+    self.render('index.html')
 
 
 class HomeHandler(BaseHandler):
@@ -146,6 +146,7 @@ class NewBookmarkHandler(BaseHandler):
   def get(self):
     # Check if popup
     is_popup = self.get_argument('p', None) == '1'
+    is_unread = self.get_argument('unread', None) == '1'
     if is_popup:
       bookmark = models.Bookmark.get_bookmark_for_uri(self.get_argument('uri'))
       if bookmark is None:
@@ -175,9 +176,26 @@ class NewBookmarkHandler(BaseHandler):
       if is_popup:
         self.write('<script>window.close()</script>')
       else:
-        self.redirect(self.reverse_url('index'))
+        self.redirect(self.reverse_url('home'))
     else:
       self.render('bookmark-form.html', form=form)
+
+
+class ReadLaterHandler(BaseHandler):
+  @tornado.web.authenticated
+  def get(self):
+    bookmark = models.Bookmark.get_bookmark_for_uri(self.get_argument('uri'))
+    if bookmark is None or bookmark.account.key() != self.current_account.key():
+      bookmark = models.Bookmark(uri=self.get_argument('uri'))
+      bookmark.account = self.current_account
+      bookmark.uri_digest = models.Bookmark.get_digest_for_uri(bookmark.uri)
+      bookmark.title = self.get_argument('title', bookmark.uri)
+      bookmark.description = self.get_argument('description', '')
+      bookmark.key_name = '%s:%s' % (self.current_account.key().name(),
+                                     bookmark.uri_digest)
+    bookmark.is_unread = True
+    bookmark.put()
+    self.write('<script>window.blur();window.close()</script>')
 
 
 class EditBookmarkHandler(BaseHandler):
@@ -193,7 +211,7 @@ class EditBookmarkHandler(BaseHandler):
       if self.get_argument('p', None):
         self.write('<script>window.close()</script>')
       else:
-        self.redirect(self.reverse_url('index'))
+        self.redirect(self.reverse_url('home'))
     else:
       self.render('bookmark-form.html', form=form)
 
@@ -223,7 +241,7 @@ class UploadHandler(BaseHandler):
                                blob=blob_key)
     new_import.put()
     taskqueue.add(url='/tasks/import', params={'key': new_import.key()})
-    self.redirect('/')
+    self.redirect(self.reverse_url('home'))
 
 
 class UpdateBookmarkHandler(BaseHandler):
@@ -260,7 +278,8 @@ class CheckAccountsHandler(BaseTaskHandler):
     # TODO Run all accounts at once!?
     for account in models.Account.all():
       taskqueue.add(url='/tasks/process_tags', params={'key': account.key()})
-      deferred.defer(account.check_bookmarks)
+      # deferred.defer(account.check_bookmarks)
+
 
 class ImportBookmarksHandler(BaseTaskHandler):
   # TODO Catch exceptions
