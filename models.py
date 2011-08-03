@@ -1,4 +1,5 @@
 import hashlib
+import itertools
 import logging
 
 from google.appengine.api import memcache
@@ -107,6 +108,37 @@ class Tag(db.Model):
   account = db.ReferenceProperty(Account, collection_name='tags')
   name = db.StringProperty(required=True)
   count = db.IntegerProperty(default=0)
+
+  def __repr__(self):
+    return u'<Tag: %s(%s)>' % (self.name, self.count)
+
+  @classmethod
+  def update_tags(cls, account, added=[], removed=[]):
+    # TODO Code duplication here
+    account_key_name = account.key().name()
+    tag_keys = ('%s:%s' % (account_key_name, tag) for tag in added)
+    tags = []
+    for name, tag in itertools.izip(added, cls.get_by_key_name(tag_keys)):
+      if tag is None:
+        tags.append(cls(account=account,
+                        key_name='%s:%s' % (account_key_name, name),
+                        name=name,
+                        count=1))
+      else:
+        tag.count += 1
+        tags.append(tag)
+    db.put(tags)
+
+    tag_keys = ('%s:%s' % (account_key_name, tag) for tag in removed)
+    tags = []
+    for name, tag in itertools.izip(added, cls.get_by_key_name(tag_keys)):
+      if tag is None:
+        # Though this shouldn't be happened
+        continue
+      else:
+        tag.count -= 1
+        tags.append(tag)
+    db.put(tags)
 
 
 class Import(db.Model):

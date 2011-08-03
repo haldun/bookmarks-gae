@@ -130,7 +130,8 @@ class NewBookmarkHandler(BaseHandler):
     is_popup = self.get_argument('p', None) == '1'
     form = forms.BookmarkForm(self)
     if form.validate():
-      account_key_name = self.current_account.key().name()
+      account = self.current_account
+      account_key_name = account.key().name()
       uri_digest = models.Bookmark.get_digest_for_uri(form.uri.data)
       key = '%s:%s' % (account_key_name, uri_digest)
       bookmark = models.Bookmark(
@@ -139,6 +140,7 @@ class NewBookmarkHandler(BaseHandler):
           uri_digest=uri_digest,
           **form.data)
       bookmark.put()
+      models.Tag.update_tags(account, added=bookmark.tags)
       if is_popup:
         self.write('<script>window.close()</script>')
       else:
@@ -155,8 +157,16 @@ class EditBookmarkHandler(BaseHandler):
   def post(self):
     form = forms.BookmarkForm(self, obj=self.bookmark)
     if form.validate():
+      current_tags = set(self.bookmark.tags)
+      new_tags = set(form.tags.data)
+      added = new_tags - current_tags
+      removed = current_tags - new_tags
+
       form.populate_obj(self.bookmark)
       self.bookmark.put()
+
+      models.Tag.update_tags(self.current_account, added=added, removed=removed)
+
       if self.get_argument('p', None):
         self.write('<script>window.close()</script>')
       else:
