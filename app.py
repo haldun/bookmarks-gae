@@ -71,7 +71,7 @@ class BaseHandler(tornado.web.RequestHandler):
 
   def render_string(self, template, **kwds):
     return tornado.web.RequestHandler.render_string(
-        self, template, users=users, **kwds)
+        self, template, users=users, IS_DEV=IS_DEV, **kwds)
 
   def get_integer(self, name, default, min_value=None, max_value=None):
     value = self.get_argument(name, '')
@@ -211,7 +211,7 @@ class EditBookmarkHandler(BaseHandler):
       if self.get_argument('p', None):
         self.write('<script>window.close()</script>')
       else:
-        self.redirect(self.reverse_url('home'))
+        self.render('module-bookmark.html', bookmark=self.bookmark)
     else:
       self.render('bookmark-form.html', form=form)
 

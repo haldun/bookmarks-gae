@@ -4,7 +4,11 @@
   <meta charset="UTF-8">
   <title>bookmarklove</title>
   <link href="http://fonts.googleapis.com/css?family=Cabin+Sketch:700&v2" rel="stylesheet">
+  {% if IS_DEV %}
   <link rel="stylesheet" href="/static/stylesheets/style.css">
+  {% else %}
+  <link rel="stylesheet" href="/static/stylesheets/style.min.css">
+  {% end %}
 </head>
 <body>
   {% block container %}
@@ -42,14 +46,26 @@
   });
 
   // Bookmark actions
-  $('ul#bookmarks').delegate('a[data-action]', 'click', function(event){
-    event.preventDefault();
+  $('ul#bookmarks').delegate('a[data-action]', 'click', function(e){
+    e.preventDefault();
     var $bookmark = $(this).closest('.bookmark'),
         bookmark_id = $bookmark.attr('id').split('_')[1],
         action = $(this).data('action');
 
     $.post('/update', {id: bookmark_id, action: action}, function(data) {
       $bookmark.replaceWith(data);
+    });
+  }).delegate('a.edit', 'click', function(e) {
+    e.preventDefault();
+    $(this).closest('.bookmark').find('div.edit-form').toggle();
+  }).delegate('a.close', 'click', function(e) {
+    e.preventDefault();
+    $(this).closest('.bookmark').find('div.edit-form').hide().find('form')[0].reset();
+  }).delegate('form', 'submit', function(e){
+    e.preventDefault();
+    var $self = $(this);
+    $.post($self.attr('action'), $self.serialize(), function(data){
+      $self.closest('.bookmark').replaceWith(data);
     });
   });
   </script>

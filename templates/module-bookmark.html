@@ -34,4 +34,16 @@
            class="button pill icon edit">Edit</a></li>
     <li><a href="#" class="button pill danger trash icon">Delete</a></li>
   </ul>
+
+  <div class="edit-form" style="display:none">
+    <form action="{{ reverse_url('edit') }}?id={{ bookmark.uri_digest }}" method="post">
+      {% module Form(bookmark.get_form()) %}
+      <div class="buttons">
+        <div class="button-group">
+          <input type="submit" class="button primary" value="Save">
+          <a href="#" class="close button">Cancel</a>
+        </div>
+      </div>
+    </form>
+  </div>
 </li>

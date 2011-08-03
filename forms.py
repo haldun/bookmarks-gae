@@ -26,6 +26,7 @@ class TagListField(wtforms.fields.Field):
   def process_formdata(self, valuelist):
     if valuelist:
       self.data = list(set(x.strip().lower() for x in valuelist[0].strip().split(',')))
+      self.data.sort()
     else:
       self.data = []
 

@@ -9,6 +9,8 @@ from google.appengine.ext import blobstore
 from google.appengine.ext import db
 from google.appengine.ext import deferred
 
+import forms
+
 class Account(db.Model):
   user = db.UserProperty(auto_current_user_add=True, required=True)
   email = db.EmailProperty(required=True) # key == <email>
@@ -123,6 +125,9 @@ class Bookmark(db.Model):
   @classmethod
   def get_bookmark_for_uri(cls, uri):
     return cls.get_bookmark_for_digest(cls.get_digest_for_uri(uri))
+
+  def get_form(self):
+    return forms.BookmarkForm(obj=self)
 
   def check(self):
     try:

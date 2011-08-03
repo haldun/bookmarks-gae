@@ -1414,3 +1414,27 @@ h1, h2, h3 {
 .auth.fb {
   background-image: url('../images/facebook_64.png');
 }
+
+form label {
+  display: block;
+  float: left;
+  width: 140px;
+  text-transform: capitalize;
+}
+
+form div.buttons {
+  padding-left: 140px;
+}
+
+div.field {
+  margin-bottom: 6px;
+}
+
+div.field.uri input, div.field.title input {
+  width: 380px;
+}
+
+div.field.description textarea {
+  width: 380px;
+  height: 60px;
+}
