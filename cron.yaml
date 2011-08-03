@@ -1,4 +1,4 @@
 cron:
 - description: process tags
-  url: /tasks/process_tags
+  url: /tasks/check_accounts
   schedule: every 60 minutes

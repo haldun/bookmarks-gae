@@ -37,6 +37,7 @@ class Application(tornado.wsgi.WSGIApplication):
 
       # Task handlers
       (r'/tasks/import', ImportBookmarksHandler),
+      (r'/tasks/check_accounts', CheckAccountsHandler),
       (r'/tasks/process_tags', ProcessTagsHandler),
     ]
     settings = dict(
@@ -251,6 +252,13 @@ class BaseTaskHandler(BaseHandler):
     self.application.settings['xsrf_cookies'] = False
 
 
+class CheckAccountsHandler(BaseTaskHandler):
+  def get(self):
+    # TODO Run all accounts at once!?
+    for account in models.Account.all():
+      taskqueue.add(url='/tasks/process_tags', params={'key': account.key()})
+
+
 class ImportBookmarksHandler(BaseTaskHandler):
   # TODO Catch exceptions
   def post(self):
@@ -304,11 +312,12 @@ class ProcessTagsHandler(BaseTaskHandler):
       for tag_name in bookmark.tags:
         tag_key_name = '%s:%s' % (account_key_name, tag_name)
         tags[(tag_name, tag_key_name)] += 1
-    db.put(models.Tag(key_name=key_name,
+    db.put([models.Tag(key_name=key_name,
                       name=name,
                       count=count,
                       account=account)
-                      for (name, key_name), count in tags.items())
+                      for (name, key_name), count in tags.items()
+                      if name])
 
 
 def main():
