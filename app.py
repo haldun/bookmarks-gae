@@ -12,9 +12,11 @@ from tornado.web import url
 
 from google.appengine.api import memcache
 from google.appengine.api import taskqueue
+from google.appengine.api import urlfetch
 from google.appengine.api import users
 from google.appengine.ext import blobstore
 from google.appengine.ext import db
+from google.appengine.ext import deferred
 from google.appengine.ext.webapp.util import run_wsgi_app
 
 import forms
@@ -86,7 +88,8 @@ class BaseHandler(tornado.web.RequestHandler):
 
 class IndexHandler(BaseHandler):
   def get(self):
-    self.render('index.html')
+    self.redirect('/home')
+    # self.render('index.html')
 
 
 class HomeHandler(BaseHandler):
@@ -257,7 +260,7 @@ class CheckAccountsHandler(BaseTaskHandler):
     # TODO Run all accounts at once!?
     for account in models.Account.all():
       taskqueue.add(url='/tasks/process_tags', params={'key': account.key()})
-
+      deferred.defer(account.check_bookmarks)
 
 class ImportBookmarksHandler(BaseTaskHandler):
   # TODO Catch exceptions

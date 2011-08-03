@@ -1,10 +1,13 @@
+import datetime
 import hashlib
 import itertools
 import logging
 
 from google.appengine.api import memcache
-from google.appengine.ext import db
+from google.appengine.api import urlfetch
 from google.appengine.ext import blobstore
+from google.appengine.ext import db
+from google.appengine.ext import deferred
 
 class Account(db.Model):
   user = db.UserProperty(auto_current_user_add=True, required=True)
@@ -76,6 +79,20 @@ class Account(db.Model):
       logging.error('Memcache set failed')
     return tags
 
+  def check_bookmarks(self):
+    query = Bookmark.all().filter('account =', self).order('-created')
+    cursor_key = 'check_bookmarks_cursor:%s' % self.key().name()
+    cursor = memcache.get(cursor_key)
+    if cursor:
+      query.with_cursor(cursor)
+      memcache.delete(cursor_key)
+    bookmarks = query.fetch(50)
+    if not bookmarks:
+      return
+    for bookmark in bookmarks:
+      bookmark.check()
+    memcache.set(cursor_key, query.cursor())
+    deferred.defer(self.check_bookmarks)
 
 class Bookmark(db.Model):
   account = db.ReferenceProperty(Account, collection_name='bookmarks')
@@ -89,6 +106,9 @@ class Bookmark(db.Model):
   is_starred = db.BooleanProperty(default=False)
   created = db.DateTimeProperty(auto_now_add=True)
   modified = db.DateTimeProperty(auto_now=True)
+  last_checked = db.DateTimeProperty()
+  last_status_code = db.IntegerProperty()
+  redirected = db.LinkProperty()
 
   @classmethod
   def get_digest_for_uri(cls, uri):
@@ -103,6 +123,20 @@ class Bookmark(db.Model):
   @classmethod
   def get_bookmark_for_uri(cls, uri):
     return cls.get_bookmark_for_digest(cls.get_digest_for_uri(uri))
+
+  def check(self):
+    try:
+      result = urlfetch.fetch(self.uri, follow_redirects=False)
+      self.last_status_code = result.status_code
+      if result.status_code == 200:
+        # TODO Get the contents and put it to the blobstore
+        pass
+      if result.status_code in (301, 302):
+        self.redirected = result.headers.get('location', self.uri)
+    except urlfetch.DownloadError:
+      self.last_status_code = 500
+    self.last_checked = datetime.datetime.utcnow()
+    self.put()
 
 
 class Tag(db.Model):
