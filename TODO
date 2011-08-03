@@ -14,3 +14,4 @@
 - update tags cron
 - save text versions to blobstore
 - show cached versions
+- change nickname form
