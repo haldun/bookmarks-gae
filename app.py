@@ -28,6 +28,7 @@ class Application(tornado.wsgi.WSGIApplication):
   def __init__(self):
     handlers = [
       url(r'/', IndexHandler, name='index'),
+      url(r'/mine', HomeHandler, name='mine'),
       url(r'/new', NewBookmarkHandler, name='new_bookmark'),
       url(r'/bookmarks/([^/]+)', ListBookmarksHandler, name='list'),
       url(r'/edit', EditBookmarkHandler, name='edit'),
@@ -43,13 +44,17 @@ class Application(tornado.wsgi.WSGIApplication):
       static_path=os.path.join(os.path.dirname(__file__), "static"),
       template_path=os.path.join(os.path.dirname(__file__), 'templates'),
       xsrf_cookies=True,
-      cookie_secret="zmxc12msadkzx209923/asd98123.=-sadnu129uaks/Vo=",
+      cookie_secret="zxccczxi123ijasdj9123asjdzcnjjl0j123jas9d0123asd",
       ui_modules=uimodules,
     )
     tornado.wsgi.WSGIApplication.__init__(self, handlers, **settings)
 
 
 class BaseHandler(tornado.web.RequestHandler):
+  # I don't know why
+  def initialize(self):
+    self.xsrf_token
+
   def get_current_user(self):
     user = users.get_current_user()
     if user:
@@ -80,9 +85,27 @@ class BaseHandler(tornado.web.RequestHandler):
 
 
 class IndexHandler(BaseHandler):
+  def get(self):
+    self.render('index.html')
+
+
+class HomeHandler(BaseHandler):
   @tornado.web.authenticated
   def get(self):
-    self.redirect(self.reverse_url('list', self.current_account.nickname))
+    query = models.Bookmark.all() \
+                           .filter('account =', self.current_account) \
+                           .order('-created')
+    tag = self.get_arguments('tag', None)
+    if tag is not None:
+      tag = tag[:2]
+      for tag in tag:
+        query = query.filter('tags =', tag)
+
+    offset = self.get_integer('offset', 0, 0)
+    limit = self.get_integer('limit', 25, 1, 100)
+    bookmarks = query.fetch(limit + 1, offset)
+    tags = self.current_account.get_popular_tags(20)
+    self.render('list.html', bookmarks=bookmarks, tags=tags)
 
 
 class ListBookmarksHandler(BaseHandler):

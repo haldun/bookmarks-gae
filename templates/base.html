@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="/static/stylesheets/style.css">
 </head>
 <body>
+  {% block container %}
   <div id="container" class="container_12">
     <div id="header">
       <h1 class="logo">bookmarklove</h1>
@@ -27,6 +28,8 @@
       bookmarklove.me
     </div>
   </div>
+  {% end %}
+
   <script src="//ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js"></script>
   <script src="/static/javascripts/site.js"></script>
   {% block scripts %}{% end %}
