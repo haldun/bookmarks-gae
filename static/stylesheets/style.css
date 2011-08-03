@@ -1403,6 +1403,10 @@ a.tag {
   background-image: url('../images/google_64.png');
 }
 
+h1, h2, h3 {
+  font-weight: 300;
+}
+
 .auth.tw {
   background-image: url('../images/twitter_64.png');
 }

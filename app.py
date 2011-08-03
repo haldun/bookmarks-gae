@@ -41,7 +41,6 @@ class Application(tornado.wsgi.WSGIApplication):
     ]
     settings = dict(
       debug=IS_DEV,
-      static_path=os.path.join(os.path.dirname(__file__), "static"),
       template_path=os.path.join(os.path.dirname(__file__), 'templates'),
       xsrf_cookies=True,
       cookie_secret="zxccczxi123ijasdj9123asjdzcnjjl0j123jas9d0123asd",
@@ -92,6 +91,12 @@ class IndexHandler(BaseHandler):
 class HomeHandler(BaseHandler):
   @tornado.web.authenticated
   def get(self):
+    if self.current_account.fresh:
+      self.current_account.fresh = False
+      self.current_account.put()
+      self.render('fresh.html')
+      return
+
     query = models.Bookmark.all() \
                            .filter('account =', self.current_account) \
                            .order('-created')
@@ -163,7 +168,6 @@ class NewBookmarkHandler(BaseHandler):
           uri_digest=uri_digest,
           **form.data)
       bookmark.put()
-      models.Tag.update_tags(account, added=bookmark.tags)
       if is_popup:
         self.write('<script>window.close()</script>')
       else:
@@ -180,16 +184,8 @@ class EditBookmarkHandler(BaseHandler):
   def post(self):
     form = forms.BookmarkForm(self, obj=self.bookmark)
     if form.validate():
-      current_tags = set(self.bookmark.tags)
-      new_tags = set(form.tags.data)
-      added = new_tags - current_tags
-      removed = current_tags - new_tags
-
       form.populate_obj(self.bookmark)
       self.bookmark.put()
-
-      models.Tag.update_tags(self.current_account, added=added, removed=removed)
-
       if self.get_argument('p', None):
         self.write('<script>window.close()</script>')
       else:

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <h1>Welcome!</h1>
+  <p>
+    To start with, you can import your existing bookmarks.
+  </p>
+
+  <h3>Delicious users</h3>
+  <p>
+    If you're a delicious user, export your bookmarks by clicking
+    <a href="https://secure.delicious.com/settings/bookmarks/export">this link</a>.
+  </p>
+  <p>
+    After downloading your bookmarks file, you can <a href="/upload">upload it
+    to bookmarklove</a> so they will be imported.
+  </p>
+
+  <h3>Safari users</h3>
+  <p>
+    Click File menu then select Export Bookmarks... After saving your
+    bookmarks file, <a href="/upload">upload it to bookmarklove</a>.
+  </p>
+
+{% end %}
