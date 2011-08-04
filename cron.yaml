@@ -1,1 +1,9 @@
 cron:
+- description: Create tag compute tasks
+  url: /tasks/create_compute_tags
+  schedule: every 1 hours
+
+- description: Create check bookmark tasks
+  url: /tasks/create_check_bookmarks
+  schedule: every 5 hours
+

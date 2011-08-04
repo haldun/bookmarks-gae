@@ -26,6 +26,11 @@ indexes:
 - kind: Bookmark
   properties:
   - name: account
+  - name: last_checked
+
+- kind: Bookmark
+  properties:
+  - name: account
   - name: tags
   - name: created
     direction: desc

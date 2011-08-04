@@ -10,12 +10,19 @@
   <link rel="stylesheet" href="/static/stylesheets/style.min.css">
   {% end %}
 </head>
-<body>
+<body class="{% block bodyclass %}{% end %}">
   {% block container %}
   <div id="container" class="container_12">
     <div id="header">
-      <h1 class="logo">bookmarklove</h1>
-      <a href="{{ escape(users.create_logout_url(request.uri)) }}">{{ _("Sign out") }}</a>
+      <div class="grid_6">
+        <h1 class="logo">bookmarklove</h1>
+      </div>
+      <div id="user-nav" class="grid_6">
+        {% if current_user %}
+          <span>{{ current_account.nickname }}</span>
+          <a href="{{ escape(users.create_logout_url(request.uri)) }}">{{ _("Sign out") }}</a>
+        {% end %}
+      </div>
     </div>
 
     <div id="main" class="grid_8">
@@ -67,6 +74,10 @@
     $.post($self.attr('action'), $self.serialize(), function(data){
       $self.closest('.bookmark').replaceWith(data);
     });
+  }).delegate('li', 'mouseover', function() {
+    $(this).find('.tools').show();
+  }).delegate('li', 'mouseout', function() {
+    $(this).find('.tools').hide();
   });
   </script>
   {% block scripts %}{% end %}

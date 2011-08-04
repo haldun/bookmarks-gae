@@ -1,6 +1,4 @@
-import collections
 import datetime
-import itertools
 import logging
 import os
 import re
@@ -12,7 +10,6 @@ from tornado.web import url
 
 from google.appengine.api import memcache
 from google.appengine.api import taskqueue
-from google.appengine.api import urlfetch
 from google.appengine.api import users
 from google.appengine.ext import blobstore
 from google.appengine.ext import db
@@ -21,6 +18,7 @@ from google.appengine.ext.webapp.util import run_wsgi_app
 
 import forms
 import models
+import tasks
 import uimodules
 
 # Constants
@@ -40,8 +38,8 @@ class Application(tornado.wsgi.WSGIApplication):
 
       # Task handlers
       (r'/tasks/import', ImportBookmarksHandler),
-      (r'/tasks/check_accounts', CheckAccountsHandler),
-      (r'/tasks/process_tags', ProcessTagsHandler),
+      (r'/tasks/create_compute_tags', CreateComputeTagsTasksHandler),
+      (r'/tasks/create_check_bookmarks', CreateCheckBookmarksTasksHandler),
     ]
     settings = dict(
       debug=IS_DEV,
@@ -71,7 +69,9 @@ class BaseHandler(tornado.web.RequestHandler):
 
   def render_string(self, template, **kwds):
     return tornado.web.RequestHandler.render_string(
-        self, template, users=users, IS_DEV=IS_DEV, **kwds)
+        self, template, users=users, IS_DEV=IS_DEV,
+        current_account=getattr(self, 'current_account', None),
+         **kwds)
 
   def get_integer(self, name, default, min_value=None, max_value=None):
     value = self.get_argument(name, '')
@@ -152,7 +152,9 @@ class NewBookmarkHandler(BaseHandler):
       if bookmark is None:
         form = forms.BookmarkForm(self)
       else:
-        self.redirect(self.reverse_url('edit') + '?&p=1&id=' + bookmark.uri_digest)
+        self.redirect(self.reverse_url('edit') +
+                      '?&p=1&id=' + bookmark.uri_digest +
+                      '&description=' + self.get_argument('description', ''))
         return
     else:
       form = forms.BookmarkForm()
@@ -201,6 +203,8 @@ class ReadLaterHandler(BaseHandler):
 class EditBookmarkHandler(BaseHandler):
   def get(self):
     form = forms.BookmarkForm(obj=self.bookmark)
+    form.description.data = self.get_argument('description',
+                                              self.bookmark.description)
     self.render('bookmark-form.html', form=form)
 
   def post(self):
@@ -218,7 +222,7 @@ class EditBookmarkHandler(BaseHandler):
   @tornado.web.authenticated
   def prepare(self):
     id = self.get_argument('id')
-    bookmark = models.Bookmark.get_bookmark_for_digest(id)
+    bookmark = self.current_account.get_bookmark_for_digest(id)
     if bookmark is None:
       raise tornado.web.HTTPError(404)
     if bookmark.account.key() != self.current_account.key():
@@ -272,15 +276,6 @@ class BaseTaskHandler(BaseHandler):
   def initialize(self):
     self.application.settings['xsrf_cookies'] = False
 
-
-class CheckAccountsHandler(BaseTaskHandler):
-  def get(self):
-    # TODO Run all accounts at once!?
-    for account in models.Account.all():
-      taskqueue.add(url='/tasks/process_tags', params={'key': account.key()})
-      # deferred.defer(account.check_bookmarks)
-
-
 class ImportBookmarksHandler(BaseTaskHandler):
   # TODO Catch exceptions
   def post(self):
@@ -321,25 +316,19 @@ class ImportBookmarksHandler(BaseTaskHandler):
     # Remove blob
     # TODO The following line does not seem to be working!?
     # blobstore.delete(bookmark_import.blob)
-    taskqueue.add(url='/tasks/process_tags', params={'key': account.key()})
+    deferred.defer(tasks.ComputeTagCounts, account.key())
 
 
-class ProcessTagsHandler(BaseTaskHandler):
-  def post(self):
-    account = models.Account.get(self.get_argument('key'))
-    tags = collections.defaultdict(int)
-    account_key_name = account.key().name()
-    # TODO Process all bookmarks at once!?
-    for bookmark in account.bookmarks:
-      for tag_name in bookmark.tags:
-        tag_key_name = '%s:%s' % (account_key_name, tag_name)
-        tags[(tag_name, tag_key_name)] += 1
-    db.put([models.Tag(key_name=key_name,
-                      name=name,
-                      count=count,
-                      account=account)
-                      for (name, key_name), count in tags.items()
-                      if name])
+class CreateComputeTagsTasksHandler(BaseTaskHandler):
+  def get(self):
+    for account in models.Account.all():
+      deferred.defer(tasks.ComputeTagCounts, account.key())
+
+
+class CreateCheckBookmarksTasksHandler(BaseTaskHandler):
+  def get(self):
+    for account in models.Account.all():
+      deferred.defer(tasks.CheckBookmarks, account.key())
 
 
 def main():

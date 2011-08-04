@@ -1,4 +1,22 @@
+{% extends "base.html" %}
+
+{% block container %}
 <form action="" method="post">
   {% module Form(form) %}
-  <input type="submit">
+  <div class="buttons">
+    <input type="submit" class="button primary" value="Save">
+    <a class="button" id="cancel" href="">Cancel</a>
+  </div>
 </form>
+{% end %}
+
+{% block bodyclass %}popup{% end %}
+
+{% block scripts %}
+<script>
+  $('#cancel').click(function(e) {
+    e.preventDefault();
+    window.close();
+  });
+</script>
+{% end %}

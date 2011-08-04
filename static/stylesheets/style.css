@@ -1438,3 +1438,20 @@ div.field.description textarea {
   width: 380px;
   height: 60px;
 }
+
+div.field.tags input {
+  width: 380px;
+}
+
+body.popup {
+  width: 580px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 20px;
+  min-width: 580px;
+}
+
+div#user-nav {
+  text-align: right;
+}
+
