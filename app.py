@@ -37,7 +37,6 @@ class Application(tornado.wsgi.WSGIApplication):
       (r'/later', ReadLaterHandler),
 
       # Task handlers
-      (r'/tasks/import', ImportBookmarksHandler),
       (r'/tasks/create_compute_tags', CreateComputeTagsTasksHandler),
       (r'/tasks/create_check_bookmarks', CreateCheckBookmarksTasksHandler),
     ]
@@ -203,8 +202,8 @@ class ReadLaterHandler(BaseHandler):
 class EditBookmarkHandler(BaseHandler):
   def get(self):
     form = forms.BookmarkForm(obj=self.bookmark)
-    form.description.data = self.get_argument('description',
-                                              self.bookmark.description)
+    form.description.data = self.get_argument(
+        'description', self.bookmark.description)
     self.render('bookmark-form.html', form=form)
 
   def post(self):
@@ -244,7 +243,7 @@ class UploadHandler(BaseHandler):
     new_import = models.Import(account=self.current_account,
                                blob=blob_key)
     new_import.put()
-    taskqueue.add(url='/tasks/import', params={'key': new_import.key()})
+    deferred.defer(tasks.ImportBookmarks, new_import.key())
     self.redirect(self.reverse_url('home'))
 
 
@@ -270,53 +269,11 @@ class UpdateBookmarkHandler(BaseHandler):
     self.render('module-bookmark.html', bookmark=bookmark)
 
 
-# Task handlers
+# Cron handlers
 
 class BaseTaskHandler(BaseHandler):
   def initialize(self):
     self.application.settings['xsrf_cookies'] = False
-
-class ImportBookmarksHandler(BaseTaskHandler):
-  # TODO Catch exceptions
-  def post(self):
-    bookmark_import = models.Import.get(self.get_argument('key'))
-    parser = html5lib.HTMLParser(
-        tree=html5lib.treebuilders.getTreeBuilder('dom'))
-    dom_tree = parser.parse(bookmark_import.blob.open())
-    bookmarks = []
-    account = bookmark_import.account
-    for link in dom_tree.getElementsByTagName('a'):
-      uri = link.getAttribute('href')
-      if not uri.startswith('http://'):
-        continue
-      title = ''.join(node.data
-                      for node in link.childNodes
-                      if node.nodeType == node.TEXT_NODE)
-      uri_digest = models.Bookmark.get_digest_for_uri(uri)
-      key = '%s:%s' % (account.key().name(), uri_digest)
-      is_private = link.getAttribute('private') == '1'
-      created = link.getAttribute('add_date')
-      try:
-        created = datetime.datetime.utcfromtimestamp(float(created))
-      except:
-        pass
-      tags = [tag.strip().lower()
-              for tag in link.getAttribute('tags').strip().split(',')
-              if link.getAttribute('tags')]
-      bookmark = models.Bookmark(
-          key_name=key, account=account, uri_digest=uri_digest,
-          title=title, uri=uri, private=is_private, created=created,
-          tags=tags)
-      bookmarks.append(bookmark)
-    db.put(bookmarks)
-    # Mark this task as completed
-    bookmark_import.status = bookmark_import.DONE
-    bookmark_import.processed = datetime.datetime.utcnow()
-    bookmark_import.put()
-    # Remove blob
-    # TODO The following line does not seem to be working!?
-    # blobstore.delete(bookmark_import.blob)
-    deferred.defer(tasks.ComputeTagCounts, account.key())
 
 
 class CreateComputeTagsTasksHandler(BaseTaskHandler):

@@ -2,6 +2,8 @@ import collections
 import datetime
 import logging
 
+import html5lib
+
 from google.appengine.api import memcache
 from google.appengine.api import urlfetch
 from google.appengine.ext import db
@@ -67,3 +69,41 @@ def CheckBookmarks(account_key):
   memcache.set(cursor_key, query.cursor())
   deferred.defer(CheckBookmarks, account_key, _countdown=120)
 
+def ImportBookmarks(import_key):
+  bookmark_import = models.Import.get(import_key)
+  parser = html5lib.HTMLParser(tree=html5lib.treebuilders.getTreeBuilder('dom'))
+  dom_tree = parser.parse(bookmark_import.blob.open())
+  bookmarks = []
+  account = bookmark_import.account
+  for link in dom_tree.getElementsByTagName('a'):
+    uri = link.getAttribute('href')
+    if not uri.startswith('http://'):
+      continue
+    title = ''.join(node.data
+                    for node in link.childNodes
+                    if node.nodeType == node.TEXT_NODE)
+    uri_digest = models.Bookmark.get_digest_for_uri(uri)
+    key = '%s:%s' % (account.key().name(), uri_digest)
+    is_private = link.getAttribute('private') == '1'
+    created = link.getAttribute('add_date')
+    try:
+      created = datetime.datetime.utcfromtimestamp(float(created))
+    except:
+      pass
+    tags = [tag.strip().lower()
+            for tag in link.getAttribute('tags').strip().split(',')
+            if link.getAttribute('tags')]
+    bookmark = models.Bookmark(
+        key_name=key, account=account, uri_digest=uri_digest,
+        title=title, uri=uri, private=is_private, created=created,
+        tags=tags)
+    bookmarks.append(bookmark)
+  db.put(bookmarks)
+  # Mark this task as completed
+  bookmark_import.status = bookmark_import.DONE
+  bookmark_import.processed = datetime.datetime.utcnow()
+  bookmark_import.put()
+  # Remove blob
+  # TODO The following line does not seem to be working!?
+  # blobstore.delete(bookmark_import.blob)
+  deferred.defer(ComputeTagCounts, account.key())
