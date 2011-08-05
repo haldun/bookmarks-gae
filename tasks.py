@@ -95,14 +95,14 @@ def ImportBookmarks(import_key):
     try:
       created = datetime.datetime.utcfromtimestamp(float(created))
     except:
-      pass
+      created = datetime.datetime.utcnow()
     tags = [tag.strip().lower()
             for tag in link.getAttribute('tags').strip().split(',')
             if link.getAttribute('tags')]
     bookmark = models.Bookmark(
         key_name=key, account=account, uri_digest=uri_digest,
         title=title, uri=uri, private=is_private, created=created,
-        tags=tags)
+        modified=created, tags=tags)
     bookmarks.append(bookmark)
   db.put(bookmarks)
   # Mark this task as completed
