@@ -19,3 +19,4 @@ builtins:
 - datastore_admin: on
 - appstats: on
 - deferred: on
+- remote_api: on
