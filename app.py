@@ -148,7 +148,7 @@ class NewBookmarkHandler(BaseHandler):
     is_popup = self.get_argument('p', None) == '1'
     is_unread = self.get_argument('unread', None) == '1'
     if is_popup:
-      bookmark = models.Bookmark.get_bookmark_for_uri(self.get_argument('uri'))
+      bookmark = self.current_account.get_bookmark_for_uri(self.get_argument('uri'))
       if bookmark is None:
         form = forms.BookmarkForm(self)
       else:
@@ -186,7 +186,7 @@ class NewBookmarkHandler(BaseHandler):
 class ReadLaterHandler(BaseHandler):
   @tornado.web.authenticated
   def get(self):
-    bookmark = models.Bookmark.get_bookmark_for_uri(self.get_argument('uri'))
+    bookmark = self.current_account.get_bookmark_for_uri(self.get_argument('uri'))
     if bookmark is None or bookmark.account.key() != self.current_account.key():
       bookmark = models.Bookmark(uri=self.get_argument('uri'))
       bookmark.account = self.current_account
@@ -253,7 +253,7 @@ class UpdateBookmarkHandler(BaseHandler):
   def post(self):
     id = self.get_argument('id')
     action = self.get_argument('action')
-    bookmark = models.Bookmark.get_bookmark_for_digest(id)
+    bookmark = self.current_account.get_bookmark_for_digest(id)
     if bookmark is None:
       raise tornado.web.HTTPError(404)
     if bookmark.account.key() != self.current_account.key():

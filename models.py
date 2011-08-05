@@ -86,6 +86,9 @@ class Account(db.Model):
   def get_bookmark_for_digest(self, id):
     return self.bookmarks.filter('uri_digest =', id).get()
 
+  def get_bookmark_for_uri(self, uri):
+    return self.get_bookmark_for_digest(Bookmark.get_digest_for_uri(uri))
+
 
 class Bookmark(db.Model):
   account = db.ReferenceProperty(Account, collection_name='bookmarks')
@@ -108,14 +111,6 @@ class Bookmark(db.Model):
     m = hashlib.md5()
     m.update(uri.encode('utf-8'))
     return m.hexdigest()
-
-  @classmethod
-  def get_bookmark_for_digest(cls, digest):
-    return cls.all().filter('uri_digest =', digest).get()
-
-  @classmethod
-  def get_bookmark_for_uri(cls, uri):
-    return cls.get_bookmark_for_digest(cls.get_digest_for_uri(uri))
 
   def get_form(self):
     return forms.BookmarkForm(obj=self)
