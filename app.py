@@ -273,13 +273,17 @@ class UpdateBookmarkHandler(BaseHandler):
 class AutocompleteHandler(BaseHandler):
   @tornado.web.authenticated
   def post(self):
-    q = self.get_argument('q')
+    q = self.get_argument('q').strip()
+    if len(q) < 2:
+      self.finish()
+      return
     tags_cache_key = "%s:tags" % self.current_account.key()
     tags = memcache.get(tags_cache_key)
     if tags is None:
       # TODO What if user has got 1000's of tags?
-      tags = [tag.name
-              for tag in models.Tag.all().filter('account =', self.current_account)]
+      tags = set([
+          tag.name
+          for tag in models.Tag.all().filter('account =', self.current_account)])
       if not memcache.add(tags_cache_key, tags):
         logging.error("Cannot set account tags in memcache")
     records = [tag for tag in tags if tag.startswith(q)]

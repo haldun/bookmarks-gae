@@ -38,3 +38,4 @@ class BookmarkForm(BaseForm):
   tags = TagListField('tags')
   is_unread = BooleanField('is unread?', default=False)
   is_private = BooleanField('is private?', default=False)
+

@@ -113,3 +113,4 @@ def ImportBookmarks(import_key):
   # TODO The following line does not seem to be working!?
   # blobstore.delete(bookmark_import.blob)
   deferred.defer(ComputeTagCounts, account.key())
+
