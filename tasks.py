@@ -16,17 +16,23 @@ def ComputeTagCounts(account_key):
   tags = collections.defaultdict(int)
   account_key_name = account.key().name()
   logging.info("Started processing tags of %s" % account.nickname)
+  # Invalidate tags cache
+  tags_cache_key = "%s:tags" % account.key()
+  memcache.delete(tags_cache_key)
   # TODO Process all bookmarks at once!?
   for bookmark in account.bookmarks:
     for tag_name in bookmark.tags:
       tag_key_name = '%s:%s' % (account_key_name, tag_name)
       tags[(tag_name, tag_key_name)] += 1
-  db.put([models.Tag(key_name=key_name,
+  tags = [models.Tag(key_name=key_name,
                     name=name,
                     count=count,
                     account=account)
                     for (name, key_name), count in tags.items()
-                    if name])
+                    if name]
+  db.put(tags)
+  if not memcache.add(tags_cache_key, [tag.name for tag in tags]):
+    logging.error("Cannot set account tags in memcache")
   logging.info("Processed tags")
 
 def CheckBookmarks(account_key):
@@ -89,14 +95,14 @@ def ImportBookmarks(import_key):
     try:
       created = datetime.datetime.utcfromtimestamp(float(created))
     except:
-      pass
+      created = datetime.datetime.utcnow()
     tags = [tag.strip().lower()
             for tag in link.getAttribute('tags').strip().split(',')
             if link.getAttribute('tags')]
     bookmark = models.Bookmark(
         key_name=key, account=account, uri_digest=uri_digest,
         title=title, uri=uri, private=is_private, created=created,
-        tags=tags)
+        modified=created, tags=tags)
     bookmarks.append(bookmark)
   db.put(bookmarks)
   # Mark this task as completed

@@ -35,6 +35,7 @@ class Application(tornado.wsgi.WSGIApplication):
       url(r'/update', UpdateBookmarkHandler, name='update'),
       (r'/upload', UploadHandler),
       (r'/later', ReadLaterHandler),
+      (r'/autocomplete', AutocompleteHandler),
 
       # Task handlers
       (r'/tasks/create_compute_tags', CreateComputeTagsTasksHandler),
@@ -270,6 +271,22 @@ class UpdateBookmarkHandler(BaseHandler):
       bookmark.is_unread = True
     bookmark.put()
     self.render('module-bookmark.html', bookmark=bookmark)
+
+
+class AutocompleteHandler(BaseHandler):
+  @tornado.web.authenticated
+  def post(self):
+    q = self.get_argument('q')
+    tags_cache_key = "%s:tags" % self.current_account.key()
+    tags = memcache.get(tags_cache_key)
+    if tags is None:
+      # TODO What if user has got 1000's of tags?
+      tags = [tag.name
+              for tag in models.Tag.all().filter('account =', self.current_account)]
+      if not memcache.add(tags_cache_key, tags):
+        logging.error("Cannot set account tags in memcache")
+    records = [tag for tag in tags if tag.startswith(q)]
+    self.write(dict(records=records))
 
 
 # Cron handlers
