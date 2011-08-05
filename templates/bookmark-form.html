@@ -14,6 +14,16 @@
 
 {% block scripts %}
 <script>
+  $('#tags').tokenInput('/autocomplete', {
+    allowCustomEntry: true,
+    method: 'POST',
+    onResult: function(data) {
+      return $.map(data.records, function(record) {
+        return {id: record, name: record};
+      });
+    },
+    theme: 'facebook'
+  });
   $('#cancel').click(function(e) {
     e.preventDefault();
     window.close();
