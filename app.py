@@ -189,7 +189,7 @@ class ReadLaterHandler(BaseHandler):
   def get(self):
     bookmark = self.current_account.get_bookmark_for_uri(
         self.get_argument('uri'))
-    if bookmark is None or bookmark.account.key() != self.current_account.key():
+    if bookmark is None:
       bookmark = models.Bookmark(uri=self.get_argument('uri'))
       bookmark.account = self.current_account
       bookmark.uri_digest = models.Bookmark.get_digest_for_uri(bookmark.uri)
